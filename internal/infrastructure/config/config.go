@@ -1,17 +1,35 @@
 package config
 
 import (
+    "encoding/json"
+    "fmt"
     "github.com/joho/godotenv"
     "log"
     "os"
 )
 
 type Config struct {
-	ProjectID string
-	GeminiAPIKey       string
-	NewsAPIKey string
-	ServiceAccountKeyPath string
-	DB_NAME string
+\t// Existing fields
+\tProjectID           string `json:"project_id"`
+\tGeminiAPIKey        string `json:"gemini_api_key"`
+\tNewsAPIKey          string `json:"news_api_key"`
+\tServiceAccountKeyPath string `json:"service_account_key_path"`
+\tDB_NAME             string `json:"db_name"`
+\t
+\t// NEW: Jonathan's super agent config
+\tGitHubToken         string `json:"github_token"`
+\tSuperAgentConfig    SuperAgentConfig `json:"jonathan_config"`
+}
+
+type SuperAgentConfig struct {
+\tMission            string                 `json:"mission_statement"`
+\tPillars            map[string]interface{} `json:"content_pillars"`
+\tStyleRules         map[string]interface{} `json:"CRITICAL_STYLE_RULES"`
+\tVoiceSignatures    []string               `json:"VOICE_SIGNATURES"`
+\tResearchRules      map[string]interface{} `json:"RESEARCH_PROTOCOL"`
+\tFrontmatterTemplate map[string]interface{} `json:"EXACT_ARTICLE_FORMAT"`
+\tGitConfig          map[string]interface{} `json:"GIT_WORKFLOW"`
+\tPublishing         map[string]interface{} `json:"publishing"`
 }
 
 func LoadConfig() (*Config, error) {
@@ -21,11 +39,32 @@ func LoadConfig() (*Config, error) {
     }
 
     config := &Config{
-		ProjectID: os.Getenv("PROJECT_ID"),
-		GeminiAPIKey: os.Getenv("GEMINI_API_KEY"),
-		NewsAPIKey: os.Getenv("NEWS_API_KEY"),
-		ServiceAccountKeyPath: os.Getenv("SERVICE_ACCOUNT_KEY_PATH"),
-		DB_NAME: os.Getenv("DB_NAME"),
+\t\tProjectID:           os.Getenv("PROJECT_ID"),
+\t\tGeminiAPIKey:        os.Getenv("GEMINI_API_KEY"),
+\t\tNewsAPIKey:          os.Getenv("NEWS_API_KEY"),
+\t\tServiceAccountKeyPath: os.Getenv("SERVICE_ACCOUNT_KEY_PATH"),
+\t\tDB_NAME:             os.Getenv("DB_NAME"),
+\t\tGitHubToken:         os.Getenv("GITHUB_TOKEN"),
+    }
+
+    // NEW: Load your super JSON
+    superPath := os.Getenv("SUPER_CONFIG_PATH")
+    if superPath == "" {
+        superPath = "./super-agent-config-v3.json"
+    }
+    
+    superData, err := os.ReadFile(superPath)
+    if err != nil {
+        log.Printf("Warning: Super config not found at %s. Download it first.", superPath)
+    } else {
+        // Parse your super JSON
+        var superConfig SuperAgentConfig
+        if err := json.Unmarshal(superData, &superConfig); err != nil {
+            log.Printf("Failed to parse super config: %v", err)
+        } else {
+            config.SuperAgentConfig = superConfig
+            log.Println("✅ Jonathan's super config loaded!")
+        }
     }
 
     return config, nil
