@@ -1,72 +1,87 @@
 package main
 
 import (
-	"ai-content-creator-agent/internal/adapters/controllers"
-	"ai-content-creator-agent/internal/adapters/repositories"
-	"ai-content-creator-agent/internal/adapters/services"
-	"ai-content-creator-agent/internal/domain/interfaces"
-	"ai-content-creator-agent/internal/domain/usecases"
-	"ai-content-creator-agent/internal/infrastructure/api"
-	"ai-content-creator-agent/internal/infrastructure/config"
+\t"ai-content-creator-agent/internal/adapters/controllers"
+\t"ai-content-creator-agent/internal/adapters/repositories"
+\t"ai-content-creator-agent/internal/adapters/services"
+\t"ai-content-creator-agent/internal/domain/interfaces"
+\t"ai-content-creator-agent/internal/domain/usecases"
+\t"ai-content-creator-agent/internal/infrastructure/api"
+\t"ai-content-creator-agent/internal/infrastructure/config"
 
-	// "ai-content-creator-agent/pkg/logger"
-	// "ai-content-creator-agent/pkg/utils"
-	"context"
-	"log"
+\t"context"
+\t"log"
 
-	"github.com/gin-gonic/gin"
+\t"github.com/gin-gonic/gin"
 )
 
 func main() {
-	// Load configuration
-	configuration, err := config.LoadConfig()
-	if err != nil {
-		log.Fatal(err.Error())
-	}
-	// Initialize logger
-	// logger.InitLogger()
+\t// Load configuration
+\tconfiguration, err := config.LoadConfig()
+\tif err != nil {
+\t\tlog.Fatal(err.Error())
+\t}
 
-	// Initialize services
-	nlpService := services.NewNLPService(configuration.GeminiAPIKey)
-	scheduleService := services.NewScheduleService()
-	// sentimentAnalayzer := services.NewSentimentAnalysisService(configuration.GeminiAPIKey)
+\t// Initialize services
+\tnlpService := services.NewNLPService(configuration.GeminiAPIKey)
+\tscheduleService := services.NewScheduleService()
 
-	// Initialize api services
-	newsApi := api.NewNewsAPI(configuration.NewsAPIKey)
+\t// Initialize api services
+\tnewsApi := api.NewNewsAPI(configuration.NewsAPIKey)
 
-	// Initialize repositories
-	companyRepo := repositories.NewCompanyRepository(context.Background(), configuration.ProjectID)
-	contentRepo := repositories.NewContentRepository(context.Background(), configuration.ProjectID)
+\t// Initialize repositories
+\tcompanyRepo := repositories.NewCompanyRepository(context.Background(), configuration.ProjectID)
+\tcontentRepo := repositories.NewContentRepository(context.Background(), configuration.ProjectID)
 
-	// Initialize usecases
-	researchUsecase := usecases.NewResearchUsecase(newsApi, nlpService)
-	companyUsecase := usecases.NewCompanyUsecase(companyRepo, scheduleService)
-	contentUsecase := usecases.NewContentUsecase(contentRepo, researchUsecase, nlpService)
-	socialMediaUsecase := usecases.NewSocialMediaMgtUsecase(contentUsecase, companyUsecase)
+\t// Initialize usecases
+\tresearchUsecase := usecases.NewResearchUsecase(newsApi, nlpService)
+\tcompanyUsecase := usecases.NewCompanyUsecase(companyRepo, scheduleService)
+\tcontentUsecase := usecases.NewContentUsecase(contentRepo, researchUsecase, nlpService)
+\tsocialMediaUsecase := usecases.NewSocialMediaMgtUsecase(contentUsecase, companyUsecase)
 
-	// Initialize Controllers
-	companyController := controllers.NewCompanyController(companyUsecase)
-	socialMediaController := controllers.NewSocialMediaMgtController(socialMediaUsecase)
+\t// NEW: Jonathan's GitHub service
+\tgithubService := services.NewGitHubService(configuration)
 
-	// Initialize social media management
-	// Initialize router
-	router := setupRouter(companyController, socialMediaController)
+\t// Initialize Controllers
+\tcompanyController := controllers.NewCompanyController(companyUsecase)
+\tsocialMediaController := controllers.NewSocialMediaMgtController(socialMediaUsecase)
 
-	// Start server
-	err = router.Run(":8080")
-	if err != nil {
-		log.Fatal(err)
-	}
+\t// Initialize router
+\trouter := setupRouter(companyController, socialMediaController, githubService)
+
+\t// Start server
+\terr = router.Run(":8080")
+\tif err != nil {
+\t\tlog.Fatal(err)
+\t}
 }
 
-func setupRouter(companyController interfaces.CompanyController, socialMediaController controllers.SocialMediaMgtController) *gin.Engine {
-	router := gin.Default()
+func setupRouter(companyController interfaces.CompanyController, socialMediaController controllers.SocialMediaMgtController, githubService *services.GitHubService) *gin.Engine {
+\trouter := gin.Default()
 
-	// Initialize controllers
-	router.POST("/post-content/:id", socialMediaController.PostOnFacebook)
-	router.POST("/reply/:id", socialMediaController.ReplyToComments)
-	router.POST("company/register", companyController.RegisterCompany)
-	router.GET("company/:id", companyController.GetCompany)
+\t// Existing routes
+\trouter.POST("/post-content/:id", socialMediaController.PostOnFacebook)
+\trouter.POST("/reply/:id", socialMediaController.ReplyToComments)
+\trouter.POST("/company/register", companyController.RegisterCompany)
+\trouter.GET("/company/:id", companyController.GetCompany)
 
-	return router
+\t// NEW: Jonathan's publishing endpoint
+\trouter.POST("/jonathan-publish", func(c *gin.Context) {
+\t\ttitle := "Test Jonathan Post"
+\t\tcontent := "---
+title: "Test"
+date: "2026-01-31"
+---
+
+# Test Article"
+\t\t
+\t\turl, err := githubService.PublishArticle(title, content)
+\t\tif err != nil {
+\t\t\tc.JSON(500, gin.H{"error": err.Error()})
+\t\t\treturn
+\t\t}
+\t\tc.JSON(200, gin.H{"published": true, "url": url})
+\t})
+
+\treturn router
 }
